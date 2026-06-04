@@ -9,7 +9,7 @@ on:
 
 env:
   AWS_REGION: us-west-2
-  SERVICE_NAME: rbac-authorizer-service
+  SERVICE_NAME: rbac-authorizer
 
 jobs:
   deploy:
@@ -54,7 +54,7 @@ jobs:
       - name: Build lambda zip
         run: |
           mkdir -p build
-          cd service
+          cd src
           zip -r ../build/${SERVICE_NAME}.zip . -x "*.git*" "__pycache__/*" "*.pyc"
           cd ..
 
@@ -160,7 +160,7 @@ jobs:
           STACK_NAME="${ENV}-jsvm-${SERVICE_NAME}"
 
           aws cloudformation deploy \
-            --template-file cft/cft-doctor-service-infra.yaml \
+            --template-file cft/cft-rbac-service-infra.yaml \
             --stack-name $STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
