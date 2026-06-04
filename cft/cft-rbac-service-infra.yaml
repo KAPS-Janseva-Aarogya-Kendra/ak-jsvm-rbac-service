@@ -1,0 +1,153 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: RBAC Lambda Authorizer
+
+Parameters:
+
+  Environment:
+    Type: String
+    AllowedValues:
+      - dev
+      - test
+      - prod
+
+  ServiceName:
+    Type: String
+    Default: rbac-authorizer
+
+  CodeBucket:
+    Type: String
+
+  CodeKey:
+    Type: String
+
+Resources:
+
+  # =========================================================
+  # IAM ROLE
+  # =========================================================
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+
+    Properties:
+      RoleName: !Sub "${Environment}-${ServiceName}-role"
+
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+
+        Statement:
+          - Effect: Allow
+
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+
+            Action:
+              - sts:AssumeRole
+
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+      Policies:
+
+        - PolicyName: RBACAuthorizerPolicy
+
+          PolicyDocument:
+            Version: "2012-10-17"
+
+            Statement:
+
+              # Read SSM Parameters
+              - Effect: Allow
+
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/jsvm/rbac-bucket-name"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/jsvm/cognito-user-pool-id"
+
+              # Read RBAC JSON files from S3
+              - Effect: Allow
+
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+
+                Resource:
+                  - "*"
+
+  # =========================================================
+  # AUTHORIZER LAMBDA
+  # =========================================================
+
+  RBACAuthorizerFunction:
+    Type: AWS::Lambda::Function
+
+    Properties:
+      FunctionName: !Sub "${Environment}-${ServiceName}"
+
+      Runtime: python3.12
+
+      Handler: authorizer.lambda_handler
+
+      Role: !GetAtt LambdaExecutionRole.Arn
+
+      Timeout: 10
+
+      MemorySize: 256
+
+      Code:
+        S3Bucket: !Ref CodeBucket
+        S3Key: !Ref CodeKey
+
+      Environment:
+        Variables:
+
+          ENVIRONMENT: !Ref Environment
+
+          RBAC_BUCKET_SSM: !Sub "/${Environment}/jsvm/rbac-bucket-name"
+
+          COGNITO_USER_POOL_ID_SSM: !Sub "/${Environment}/jsvm/cognito-user-pool-id"
+
+  # =========================================================
+  # SSM PARAMETERS
+  # =========================================================
+
+  RBACAuthorizerNameParam:
+    Type: AWS::SSM::Parameter
+
+    Properties:
+      Name: !Sub "/${Environment}/jsvm/rbac-authorizer-name"
+
+      Type: String
+
+      Value: !Ref RBACAuthorizerFunction
+
+  RBACAuthorizerArnParam:
+    Type: AWS::SSM::Parameter
+
+    Properties:
+      Name: !Sub "/${Environment}/jsvm/rbac-authorizer-arn"
+
+      Type: String
+
+      Value: !GetAtt RBACAuthorizerFunction.Arn
+
+# =========================================================
+# OUTPUTS
+# =========================================================
+
+Outputs:
+
+  RBACAuthorizerFunctionName:
+    Description: RBAC Authorizer Function Name
+
+    Value: !Ref RBACAuthorizerFunction
+
+  RBACAuthorizerFunctionArn:
+    Description: RBAC Authorizer Function ARN
+
+    Value: !GetAtt RBACAuthorizerFunction.Arn
