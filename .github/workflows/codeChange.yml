@@ -113,8 +113,6 @@ jobs:
       # ----------------------
       - name: Update Lambda Function Code
         run: |
-#       FUNCTION_NAME="${ENV}-jsvm-${SERVICE_NAME}"
-
           FUNCTION_NAME="${ENV}-${SERVICE_NAME}"
 
           aws lambda update-function-code \
