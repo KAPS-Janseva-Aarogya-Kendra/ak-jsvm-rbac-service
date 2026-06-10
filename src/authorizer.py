@@ -128,7 +128,7 @@ def build_policy(principal: str, effect: str, resource: str = '*') -> Dict[str, 
 
 
 def lambda_handler(event, context) -> Dict[str, Any]:
-    logger.info(f" Authorizer event: {json.dumps(event)}")
+    logger.info(f" add Authorizer event: {json.dumps(event)}")
 
     token = event.get('authorizationToken', '')
     if token.startswith('Bearer '):
