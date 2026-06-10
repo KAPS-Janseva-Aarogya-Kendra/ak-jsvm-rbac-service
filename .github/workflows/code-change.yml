@@ -134,10 +134,10 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ "${{ github.event.inputs.force_api_gateway_deploy }}" == "true" ]; then
             echo "endpoint_changed=true" >> $GITHUB_OUTPUT
             echo "🔧 Manual trigger: Force API Gateway deployment enabled"
-          # Check if lambda_handler.py or any route-related files changed (for push events)
-          elif [ "${{ github.event_name }}" == "push" ] && git diff HEAD~1 HEAD service/lambda_handler.py | grep -E "(path|httpMethod|def lambda_handler)" > /dev/null; then
+          # Check if authorizer.py or any route-related files changed (for push events)
+          elif [ "${{ github.event_name }}" == "push" ] && git diff HEAD~1 HEAD src/authorizer.py | grep -E "(path|httpMethod|def lambda_handler)" > /dev/null; then
             echo "endpoint_changed=true" >> $GITHUB_OUTPUT
-            echo "📦 Endpoint changes detected in lambda_handler.py"
+            echo "📦 Endpoint changes detected in authorizer.py"
           else
             echo "endpoint_changed=false" >> $GITHUB_OUTPUT
             echo "✅ No endpoint changes detected"
