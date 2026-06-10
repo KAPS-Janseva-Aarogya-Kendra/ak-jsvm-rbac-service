@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+from logging import Logger
 from typing import Dict, Any, List, Optional
 
 import boto3
@@ -20,13 +21,14 @@ s3 = session.client('s3')
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'dev')
 RBAC_BUCKET_SSM = os.environ.get('RBAC_BUCKET_SSM', f"/{ENVIRONMENT}/jsvm/rbac-bucket-name")
 COGNITO_USER_POOL_ID_SSM = os.environ.get('COGNITO_USER_POOL_ID_SSM', f"/{ENVIRONMENT}/jsvm/cognito-user-pool-id")
+COGNITO_APP_CLIENT_ID_SSM = os.environ.get('COGNITO_APP_CLIENT_ID_SSM', f"/{ENVIRONMENT}/jsvm/cognito-client-id")
+
 VERIFY_JWT = os.environ.get('VERIFY_JWT', 'true').lower() in ('1', 'true', 'yes')
 
 
 def get_ssm_parameter(name: str) -> str:
     resp = ssm.get_parameter(Name=name)
     return resp['Parameter']['Value']
-
 
 def load_rbac_policy() -> Dict[str, Any]:
     """Load RBAC policy JSON. Try S3 (production) then fall back to local file (dev/test)."""
@@ -53,26 +55,27 @@ def get_jwks_url(user_pool_id: str) -> str:
     region = session.region_name or os.environ.get('AWS_REGION', 'us-west-2')
     return f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}/.well-known/jwks.json"
 
+def get_aws_region():
+    region = os.environ["AWS_REGION"]
+    if not region:
+        region = "us-west-2"
+    return region
 
-def verify_jwt(token: str) -> Dict[str, Any]:
-    """Verify JWT using Cognito JWKS if possible, else decode without verification (if allowed)."""
-    if VERIFY_JWT:
-        try:
-            user_pool_id = get_ssm_parameter(COGNITO_USER_POOL_ID_SSM)
-            jwks_url = get_jwks_url(user_pool_id)
-            logger.info(f"Verifying token with JWKS: {jwks_url}")
-            jwk_client = PyJWKClient(jwks_url)
-            signing_key = jwk_client.get_signing_key_from_jwt(token)
-            decoded = jwt.decode(token, signing_key.key, algorithms=["RS256"], options={"verify_aud": False})
-            return decoded
-        except Exception as e:
-            logger.warning(f"JWT verification failed: {e}")
-            # Fall through to non-verified decode only if VERIFY_JWT is false; otherwise raise
-            if VERIFY_JWT:
-                raise
-    # Non-verified decode (useful for local/dev testing)
-    logger.info("Decoding token without signature verification (unsafe for production)")
-    return jwt.decode(token, options={"verify_signature": False})
+def get_claims(token):
+    USER_POOL_ID = get_ssm_parameter(COGNITO_USER_POOL_ID_SSM)
+    REGION = get_aws_region()
+    jwks_client = PyJWKClient(jwks_url = get_jwks_url())
+    signing_key = jwks_client.get_signing_key_from_jwt(token)
+
+    return jwt.decode(
+        token,
+        signing_key.key,
+        algorithms=["RS256"],
+        issuer=f"https://cognito-idp.{REGION}.amazonaws.com/{USER_POOL_ID}",
+        audience=get_ssm_parameter(COGNITO_APP_CLIENT_ID_SSM)
+    )
+
+
 
 
 def parse_method_and_path(method_arn: str) -> (str, str):
@@ -143,7 +146,7 @@ def lambda_handler(event, context) -> Dict[str, Any]:
 
     # Decode / verify token
     try:
-        claims = verify_jwt(token)
+        claims = get_claims(token)
     except Exception as e:
         logger.error(f"Token verification failed: {e}")
         raise Exception('Unauthorized')
@@ -159,32 +162,33 @@ def lambda_handler(event, context) -> Dict[str, Any]:
 
     policy = load_rbac_policy()
     roles = policy.get('roles', {})
+    Logger.info(f"Loaded RBAC policy with roles: {list(roles.keys())}")
+    #
+    # # If still no role, try users mapping in policy (optional)
+    # if not role:
+    #     users_map = policy.get('users', {})
+    #     role = users_map.get(principal)
+    #
+    # if not role:
+    #     role = 'USER'
+    #
+    # # Evaluate permissions
+    # role_def = roles.get(role, {})
+    # permissions: List[str] = role_def.get('permissions', []) if role_def else []
+    #
+    # allowed = False
+    # for perm in permissions:
+    #     if permission_matches(perm, method, path):
+    #         allowed = True
+    #         break
+    #
+    # effect = 'Allow' if allowed else 'Deny'
+    # auth_response = build_policy(principal, effect, '*')
+    # # context values must be strings
+    # auth_response['context'] = {
+    #     'role': role,
+    # }
 
-    # If still no role, try users mapping in policy (optional)
-    if not role:
-        users_map = policy.get('users', {})
-        role = users_map.get(principal)
-
-    if not role:
-        role = 'USER'
-
-    # Evaluate permissions
-    role_def = roles.get(role, {})
-    permissions: List[str] = role_def.get('permissions', []) if role_def else []
-
-    allowed = False
-    for perm in permissions:
-        if permission_matches(perm, method, path):
-            allowed = True
-            break
-
-    effect = 'Allow' if allowed else 'Deny'
-    auth_response = build_policy(principal, effect, '*')
-    # context values must be strings
-    auth_response['context'] = {
-        'role': role,
-    }
-
-    logger.info(f"Auth response for {principal}: effect={effect}, role={role}, method={method}, path={path}")
-    return auth_response
+    # logger.info(f"Auth response for {principal}: effect={effect}, role={role}, method={method}, path={path}")
+    return roles.get(role)
 
