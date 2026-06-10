@@ -161,10 +161,7 @@ jobs:
               Environment=${ENV} \
               CodeBucket=${CODE_BUCKET} \
               CodeKey=${CODE_KEY} \
-              DatabaseBucket=${DATABASE_BUCKET} \
-              RBACBucket=${RBAC_BUCKET} \
-              RBACBucketUrl=${RBAC_BUCKET_URL}
-
+              DatabaseBucket=${DATABASE_BUCKET} 
           echo "🚀 API Gateway stack deployed"
 
       # ----------------------
