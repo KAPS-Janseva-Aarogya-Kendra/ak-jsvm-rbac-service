@@ -132,63 +132,63 @@ def build_policy(principal: str, effect: str, resource: str = '*') -> Dict[str, 
 
 def lambda_handler(event, context) -> Dict[str, Any]:
     logger.info(f" Authorizer event: {json.dumps(event)}")
-
-    token = event.get('authorizationToken', '')
-    if token.startswith('Bearer '):
-        token = token[len('Bearer '):]
-
-    if not token:
-        logger.warning('No authorization token provided')
-        raise Exception('Unauthorized')
-
-    method_arn = event.get('methodArn', '')
-    method, path = parse_method_and_path(method_arn)
-
-    # Decode / verify token
-    try:
-        claims = get_claims(token)
-    except Exception as e:
-        logger.error(f"Token verification failed: {e}")
-        raise Exception('Unauthorized')
-
-    principal = claims.get('sub') or claims.get('username') or 'anonymous'
-
-    # Determine role: claim 'role' > cognito:groups first entry > users mapping in policy
-    role = claims.get('role')
-    if not role and 'cognito:groups' in claims:
-        groups = claims.get('cognito:groups')
-        if isinstance(groups, list) and groups:
-            role = groups[0]
-
-    policy = load_rbac_policy()
-    roles = policy.get('roles', {})
-    Logger.info(f"Loaded RBAC policy with roles: {list(roles.keys())}")
     #
-    # # If still no role, try users mapping in policy (optional)
-    # if not role:
-    #     users_map = policy.get('users', {})
-    #     role = users_map.get(principal)
+    # token = event.get('authorizationToken', '')
+    # if token.startswith('Bearer '):
+    #     token = token[len('Bearer '):]
     #
-    # if not role:
-    #     role = 'USER'
+    # if not token:
+    #     logger.warning('No authorization token provided')
+    #     raise Exception('Unauthorized')
     #
-    # # Evaluate permissions
-    # role_def = roles.get(role, {})
-    # permissions: List[str] = role_def.get('permissions', []) if role_def else []
+    # method_arn = event.get('methodArn', '')
+    # method, path = parse_method_and_path(method_arn)
     #
-    # allowed = False
-    # for perm in permissions:
-    #     if permission_matches(perm, method, path):
-    #         allowed = True
-    #         break
+    # # Decode / verify token
+    # try:
+    #     claims = get_claims(token)
+    # except Exception as e:
+    #     logger.error(f"Token verification failed: {e}")
+    #     raise Exception('Unauthorized')
     #
-    # effect = 'Allow' if allowed else 'Deny'
-    # auth_response = build_policy(principal, effect, '*')
-    # # context values must be strings
-    # auth_response['context'] = {
-    #     'role': role,
-    # }
-
-    # logger.info(f"Auth response for {principal}: effect={effect}, role={role}, method={method}, path={path}")
-    return roles.get(role)
+    # principal = claims.get('sub') or claims.get('username') or 'anonymous'
+    #
+    # # Determine role: claim 'role' > cognito:groups first entry > users mapping in policy
+    # role = claims.get('role')
+    # if not role and 'cognito:groups' in claims:
+    #     groups = claims.get('cognito:groups')
+    #     if isinstance(groups, list) and groups:
+    #         role = groups[0]
+    #
+    # policy = load_rbac_policy()
+    # roles = policy.get('roles', {})
+    # Logger.info(f"Loaded RBAC policy with roles: {list(roles.keys())}")
+    # #
+    # # # If still no role, try users mapping in policy (optional)
+    # # if not role:
+    # #     users_map = policy.get('users', {})
+    # #     role = users_map.get(principal)
+    # #
+    # # if not role:
+    # #     role = 'USER'
+    # #
+    # # # Evaluate permissions
+    # # role_def = roles.get(role, {})
+    # # permissions: List[str] = role_def.get('permissions', []) if role_def else []
+    # #
+    # # allowed = False
+    # # for perm in permissions:
+    # #     if permission_matches(perm, method, path):
+    # #         allowed = True
+    # #         break
+    # #
+    # # effect = 'Allow' if allowed else 'Deny'
+    # # auth_response = build_policy(principal, effect, '*')
+    # # # context values must be strings
+    # # auth_response['context'] = {
+    # #     'role': role,
+    # # }
+    #
+    # # logger.info(f"Auth response for {principal}: effect={effect}, role={role}, method={method}, path={path}")
+    # return roles.get(role)
 
