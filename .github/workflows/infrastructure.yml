@@ -3,8 +3,8 @@ name: Deploy New Service (CFT changes)
 on:
   push:
     branches: [dev, test, main]
-    # paths:
-    #   - 'cft/**'          # 👈 trigger ONLY if this folder changes
+    paths:
+       - 'cft/**'          # 👈 trigger ONLY if this folder changes
   workflow_dispatch:      # Allows you to manually click "Run workflow" in GitHub UI
 
 env:
