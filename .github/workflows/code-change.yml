@@ -113,7 +113,7 @@ jobs:
       # ----------------------
       - name: Update Lambda Function Code
         run: |
-#      TODO FUNCTION_NAME="${ENV}-jsvm-${SERVICE_NAME}"
+#       FUNCTION_NAME="${ENV}-jsvm-${SERVICE_NAME}"
 
           FUNCTION_NAME="${ENV}-${SERVICE_NAME}"
 
