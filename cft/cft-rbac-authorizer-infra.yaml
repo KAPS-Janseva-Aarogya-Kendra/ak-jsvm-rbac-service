@@ -116,10 +116,6 @@ Resources:
 
       MemorySize: 256
 
-      # Enable CloudWatch Lambda Insights with extension layer
-      Layers:
-        - !Sub "arn:aws:lambda:${AWS::Region}:580247275435:layer:LambdaInsightsExtension:33"
-
       Code:
         S3Bucket: !Ref CodeBucket
         S3Key: !Ref CodeKey
