@@ -104,7 +104,7 @@ Resources:
     Type: AWS::Lambda::Function
 
     Properties:
-      FunctionName: !Sub "jsvm-${ENV}-${SERVICE_NAME}"
+      FunctionName: !Sub "jsvm-${Environment}-${ServiceName}"
 
       Runtime: python3.12
 
