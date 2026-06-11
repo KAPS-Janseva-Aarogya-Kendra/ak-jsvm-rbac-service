@@ -190,7 +190,7 @@ jobs:
       # ----------------------
       - name: Output API URL
         run: |
-          STACK_NAME="${ENV}-jsvm-${SERVICE_NAME}"
+          STACK_NAME="jsvm-${ENV}-${SERVICE_NAME}"
 
           API_URL=$(aws cloudformation describe-stacks \
             --stack-name $STACK_NAME \
