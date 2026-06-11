@@ -122,11 +122,8 @@ Resources:
 
       Environment:
         Variables:
-
           ENVIRONMENT: !Ref Environment
-
           RBAC_BUCKET_SSM: !Sub "/${Environment}/jsvm/rbac-bucket-name"
-
           COGNITO_USER_POOL_ID_SSM: !Sub "/${Environment}/jsvm/cognito-user-pool-id"
 
       LoggingConfig:
@@ -165,8 +162,7 @@ Outputs:
     Value: !Ref RBACAuthorizerFunction
 
   RBACAuthorizerFunctionArn:
-    Description: RBAC Authorizer Function ARN
-
+    Description: RBAC Authorizer ARN
     Value: !GetAtt RBACAuthorizerFunction.Arn
 
   RBACAuthorizerLogGroup:
