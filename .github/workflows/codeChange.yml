@@ -77,12 +77,19 @@ jobs:
       # ----------------------
       - name: Build lambda zip
         run: |
-          mkdir -p build
+          rm -rf build
+          mkdir -p build/package
 
-          cd src
-          zip -r ../build/${SERVICE_NAME}.zip . \
-            -x "*.git*" "__pycache__/*" "*.pyc"
-          cd ..
+        # install dependencies into package folder
+          pip install -r requirements.txt -t build/package
+      
+        # copy source code
+          cp -r src/* build/package/
+      
+        # create zip
+          cd build/package
+          zip -r ../${SERVICE_NAME}.zip . -x "*.git*" "__pycache__/*" "*.pyc"
+          cd ../..
 
       # ----------------------
       # GET CODE BUCKET
@@ -113,7 +120,7 @@ jobs:
       # ----------------------
       - name: Update Lambda Function Code
         run: |
-          FUNCTION_NAME="${ENV}-${SERVICE_NAME}"
+          FUNCTION_NAME="jsvm-${ENV}-${SERVICE_NAME}
 
           aws lambda update-function-code \
             --function-name $FUNCTION_NAME \
