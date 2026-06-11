@@ -53,10 +53,19 @@ jobs:
       # ----------------------
       - name: Build lambda zip
         run: |
-          mkdir -p build
-          cd src
-          zip -r ../build/${SERVICE_NAME}.zip . -x "*.git*" "__pycache__/*" "*.pyc"
-          cd ..
+          rm -rf build
+          mkdir -p build/package
+      
+          # install dependencies into package folder
+          pip install -r requirements.txt -t build/package
+      
+          # copy source code
+          cp -r src/* build/package/
+      
+          # create zip
+          cd build/package
+          zip -r ../${SERVICE_NAME}.zip . -x "*.git*" "__pycache__/*" "*.pyc"
+          cd ../..
 
       # ----------------------
       # GET DATABASE BUCKET
@@ -157,10 +166,10 @@ jobs:
       # ----------------------
       - name: Deploy Stack
         run: |
-          STACK_NAME="${ENV}-jsvm-${SERVICE_NAME}"
+          STACK_NAME="jsvm-${ENV}-${SERVICE_NAME}"
 
           aws cloudformation deploy \
-            --template-file cft/cft-rbac-service-infra.yaml \
+            --template-file cft/cft-rbac-authorizer-infra.yaml \
             --stack-name $STACK_NAME \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
