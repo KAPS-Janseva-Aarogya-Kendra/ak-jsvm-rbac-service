@@ -93,7 +93,7 @@ Resources:
   RBACAuthorizerLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/aws/lambda/${Environment}-${ServiceName}"
+      LogGroupName: !Sub "/aws/lambda/jsvm-${Environment}-${ServiceName}"
       RetentionInDays: !Ref LogRetentionInDays
 
   # =========================================================
