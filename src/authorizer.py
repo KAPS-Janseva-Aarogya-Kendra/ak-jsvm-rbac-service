@@ -122,7 +122,7 @@ def lambda_handler(event, context):
         token = event.get("authorizationToken")
 
         if not token:
-            raise Exception("Missing token")
+            raise Exception("Missing tokens")
 
         if not token.startswith("Bearer "):
             raise Exception("Invalid token format")
