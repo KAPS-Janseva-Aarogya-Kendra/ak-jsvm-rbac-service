@@ -80,13 +80,10 @@ jobs:
           rm -rf build
           mkdir -p build/package
 
-        # install dependencies into package folder
           pip install -r requirements.txt -t build/package
       
-        # copy source code
           cp -r src/* build/package/
       
-        # create zip
           cd build/package
           zip -r ../${SERVICE_NAME}.zip . -x "*.git*" "__pycache__/*" "*.pyc"
           cd ../..
@@ -120,7 +117,7 @@ jobs:
       # ----------------------
       - name: Update Lambda Function Code
         run: |
-          FUNCTION_NAME="jsvm-${ENV}-${SERVICE_NAME}
+          FUNCTION_NAME="jsvm-${ENV}-${SERVICE_NAME}"
 
           aws lambda update-function-code \
             --function-name $FUNCTION_NAME \
@@ -166,7 +163,6 @@ jobs:
               Environment=${ENV} \
               CodeBucket=${CODE_BUCKET} \
               CodeKey=${CODE_KEY} \
-              DatabaseBucket=${DATABASE_BUCKET} 
           echo "🚀 API Gateway stack deployed"
 
       # ----------------------
