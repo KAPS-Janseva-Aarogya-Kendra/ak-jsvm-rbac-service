@@ -75,6 +75,7 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/jsvm/rbac-bucket-name"
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/jsvm/cognito-user-pool-id"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Environment}/jsvm/cognito-client-id"
 
               # Read RBAC JSON files from S3
               - Effect: Allow
@@ -125,6 +126,7 @@ Resources:
           ENVIRONMENT: !Ref Environment
           RBAC_BUCKET_SSM: !Sub "/${Environment}/jsvm/rbac-bucket-name"
           COGNITO_USER_POOL_ID_SSM: !Sub "/${Environment}/jsvm/cognito-user-pool-id"
+          COGNITO_CLIENT_ID_SSM: !Sub "/${Environment}/jsvm/cognito-client-id"
 
       LoggingConfig:
         LogFormat: JSON
