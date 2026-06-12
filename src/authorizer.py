@@ -5,4 +5,4 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
-    logger.info(f" Authorizer event: {json.dumps(event)}")
+    logger.info(f" Authorizer event is : {json.dumps(event)}")
