@@ -257,12 +257,15 @@ def lambda_handler(event, context):
             raise Exception("Invalid token")
         logger.info("Token received, validating..." , token)
         jwt_token = token.split(" ")[1]
+        logger.info("jwt_token is : %s", jwt_token)
 
         claims = validate_jwt(jwt_token, cfg)
 
         user_id = claims.get("sub", "unknown")
         groups = claims.get("cognito:groups", []) or []
         method_arn = event["methodArn"]
+        logger.info("method_arn is : %s", method_arn)
+        logger.info(json.dumps(claims))
 
         method, path = normalize_method_arn(method_arn)
 
