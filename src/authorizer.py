@@ -1,14 +1,51 @@
 import json
-import os
 import time
 import logging
-import boto3
 import urllib.request
+import os
 import jwt
+import boto3
 from jwt.algorithms import RSAAlgorithm
 
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+# Structured logger configuration
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "authorizer")
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+
+logger = logging.getLogger(SERVICE_NAME)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+
+    class JsonFormatter(logging.Formatter):
+        def format(self, record):
+            base = {
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(record.created)),
+                "level": record.levelname,
+                "service": SERVICE_NAME,
+                "message": record.getMessage(),
+            }
+            # include simple extras
+            extras = {k: v for k, v in record.__dict__.items()
+                      if k not in ("name", "msg", "args", "levelname", "levelno", "pathname",
+                                   "filename", "module", "exc_info", "exc_text", "stack_info",
+                                   "lineno", "funcName", "created", "msecs", "relativeCreated",
+                                   "thread", "threadName", "processName", "process")}
+            if extras:
+                base.update(extras)
+            return json.dumps(base)
+
+    handler.setFormatter(JsonFormatter())
+    logger.addHandler(handler)
+
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+
+
+def enrich(extra: dict = None, request_id: str = None) -> dict:
+    base = {"service": SERVICE_NAME}
+    if request_id:
+        base["requestId"] = request_id
+    if extra:
+        base.update(extra)
+    return base
 
 ssm = boto3.client("ssm")
 
@@ -42,8 +79,10 @@ PERMISSIONS = {
 # =========================
 def load_config():
     if CONFIG_CACHE["loaded"]:
+        logger.debug("Config cache hit")
         return CONFIG_CACHE
 
+    logger.info("Loading configuration from SSM")
     user_pool_id = ssm.get_parameter(
         Name=os.environ["COGNITO_USER_POOL_ID_SSM"],
         WithDecryption=False
@@ -68,6 +107,7 @@ def load_config():
         "jwks_url": jwks_url
     })
 
+    logger.info("Configuration loaded", extra=enrich({"issuer": issuer, "client_id": client_id}))
     return CONFIG_CACHE
 
 # =========================
@@ -77,40 +117,62 @@ def get_jwks(cfg):
     now = time.time()
 
     if JWKS_CACHE["keys"] and now - JWKS_CACHE["ts"] < JWKS_TTL:
+        logger.debug("JWKS cache hit", extra=enrich({"cached": True}))
         return JWKS_CACHE["keys"]
 
-    with urllib.request.urlopen(cfg["jwks_url"]) as r:
-        jwks = json.loads(r.read().decode("utf-8"))
+    logger.info("Fetching JWKS", extra=enrich({"jwks_url": cfg.get("jwks_url")}))
+    try:
+        with urllib.request.urlopen(cfg["jwks_url"]) as r:
+            jwks = json.loads(r.read().decode("utf-8"))
+    except Exception as exc:
+        logger.exception("Failed to fetch JWKS", extra=enrich({"error": str(exc)}))
+        raise
 
     JWKS_CACHE["keys"] = jwks["keys"]
     JWKS_CACHE["ts"] = now
 
+    logger.debug("JWKS fetched and cached", extra=enrich({"keys_count": len(jwks.get("keys", []))}))
     return JWKS_CACHE["keys"]
 
 # =========================
 # TOKEN VALIDATION
 # =========================
 def validate_jwt(token, cfg):
-    header = jwt.get_unverified_header(token)
+    try:
+        header = jwt.get_unverified_header(token)
+    except Exception as exc:
+        logger.exception("Failed to parse JWT header", extra=enrich({"error": str(exc)}))
+        raise
 
     kid = header.get("kid")
     if not kid:
+        logger.warning("JWT missing kid header")
         raise Exception("Missing kid")
 
     key = next((k for k in get_jwks(cfg) if k["kid"] == kid), None)
     if not key:
+        logger.error("Public key not found for kid", extra=enrich({"kid": kid}))
         raise Exception("Public key not found")
 
-    public_key = RSAAlgorithm.from_jwk(json.dumps(key))
+    try:
+        public_key = RSAAlgorithm.from_jwk(json.dumps(key))
+    except Exception as exc:
+        logger.exception("Failed to construct public key from JWK", extra=enrich({"kid": kid, "error": str(exc)}))
+        raise
 
-    claims = jwt.decode(
-        token,
-        public_key,
-        algorithms=["RS256"],
-        audience=cfg["client_id"],
-        issuer=cfg["issuer"]
-    )
+    try:
+        claims = jwt.decode(
+            token,
+            public_key,
+            algorithms=["RS256"],
+            audience=cfg["client_id"],
+            issuer=cfg["issuer"]
+        )
+    except Exception as exc:
+        logger.warning("JWT validation failed", extra=enrich({"kid": kid, "error": str(exc)}))
+        raise
 
+    logger.info("JWT validated", extra=enrich({"sub": claims.get("sub"), "kid": kid}))
     return claims
 
 # =========================
@@ -139,6 +201,7 @@ def is_allowed(groups, method, path):
 
         for rule in allowed:
             if rule == "*":
+                logger.debug("RBAC allow: wildcard", extra=enrich({"group": group, "resource": resource}))
                 return True
 
             rule_method, rule_path = rule.split(" ")
@@ -148,8 +211,10 @@ def is_allowed(groups, method, path):
 
             # wildcard path support
             if rule_path == path or rule_path.endswith("/*") and path.startswith(rule_path[:-1]):
+                logger.debug("RBAC allow: matched rule", extra=enrich({"group": group, "rule": rule, "resource": resource}))
                 return True
 
+    logger.debug("RBAC deny: no matching rule", extra=enrich({"groups": groups, "resource": resource}))
     return False
 
 # =========================
@@ -185,6 +250,7 @@ def lambda_handler(event, context):
 
     try:
         cfg = load_config()
+        logger.info("cfg is : %s", cfg)
 
         token = event.get("authorizationToken")
         if not token or not token.startswith("Bearer "):
