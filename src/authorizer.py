@@ -263,7 +263,7 @@ def lambda_handler(event, context):
         groups = claims.get("cognito:groups", []) or []
 
         method, path = normalize_method_arn(method_arn)
-        logger.info("Processing request %s %s", method, path)
+        logger.info("Processing request %s %s %s ", method, path, groups)
 
         # Evaluate RBAC rules matrix
         if is_allowed(groups, method, path):
